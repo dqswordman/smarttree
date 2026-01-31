@@ -1,0 +1,9 @@
+rust_workspace/  [workspace: cargo]  [rs]
+|-- crates/
+|   |-- cli/  [rs]  cli - CLI tool
+|   |   |-- src/
+|   |   `-- Cargo.toml
+|   `-- core/  [rs]  core - Core library
+|       |-- src/
+|       `-- Cargo.toml
+`-- Cargo.toml

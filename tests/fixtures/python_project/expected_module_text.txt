@@ -1,0 +1,4 @@
+python_project/  [py]  python-project - Sample Python package
+|-- src/
+|-- tests/
+`-- pyproject.toml

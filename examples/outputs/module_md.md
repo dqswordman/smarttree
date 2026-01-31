@@ -1,0 +1,17 @@
+```text
+my-repo/  [workspace: pnpm]
+|-- apps/
+|   |-- api/  [node]  @acme/api - API server
+|   |   |-- src/
+|   |   `-- package.json
+|   `-- web/  [node]  @acme/web - Web app
+|       |-- src/
+|       `-- package.json
+`-- packages/
+    |-- ui/  [node]  @acme/ui - UI components
+    |   |-- src/
+    |   `-- package.json
+    `-- utils/  [node]  @acme/utils - Utilities
+        |-- src/
+        `-- package.json
+```

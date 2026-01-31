@@ -1,0 +1,3 @@
+```text
+smarttree --format md
+```
