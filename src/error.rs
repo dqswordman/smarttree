@@ -16,6 +16,12 @@ pub enum SmarttreeError {
         #[source]
         source: serde_yaml::Error,
     },
+    #[error("failed to write config file at {path}: {source}")]
+    ConfigWrite {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
     #[error("invalid glob pattern '{pattern}': {source}")]
     InvalidPattern {
         pattern: String,

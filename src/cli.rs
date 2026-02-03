@@ -5,7 +5,12 @@ use clap::{ArgAction, Parser};
 use crate::model::{Format, Lens};
 
 #[derive(Parser, Debug)]
-#[command(name = "smarttree", version, about = "Project-aware tree output")]
+#[command(
+    name = "smarttree",
+    version,
+    about = "Project-aware tree output",
+    after_help = "Examples:\n  smarttree\n  smarttree . --lens files --depth 3\n  smarttree --format md --max-children 60\n  smarttree --init\n"
+)]
 pub struct Cli {
     /// Path to scan (default: current directory)
     #[arg(value_name = "PATH", default_value = ".")]
@@ -46,6 +51,10 @@ pub struct Cli {
     /// Disable config file loading
     #[arg(long, action = ArgAction::SetTrue)]
     pub no_config: bool,
+
+    /// Create a default .smarttree.yaml in the target directory and exit
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub init: bool,
 
     /// Add an ignore pattern (repeatable)
     #[arg(long = "ignore", value_name = "PATTERN")]

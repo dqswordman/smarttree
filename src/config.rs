@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -59,6 +60,12 @@ pub struct Config {
     pub key_dirs: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct InitOutcome {
+    pub path: PathBuf,
+    pub created: bool,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct ConfigFile {
@@ -103,23 +110,7 @@ fn load_config_file(path: &Path) -> Result<ConfigFile> {
     Ok(config)
 }
 
-pub fn load(cli: &Cli) -> Result<Config> {
-    let root = cli.path.clone();
-    let config_root = resolve_root(&cli.path);
-
-    let config_file = if cli.no_config {
-        None
-    } else if let Some(path) = &cli.config {
-        Some(path.clone())
-    } else {
-        find_config_file(&config_root)
-    };
-
-    let file_config = match config_file {
-        Some(path) => load_config_file(&path)?,
-        None => ConfigFile::default(),
-    };
-
+fn build_config(root: PathBuf, cli: &Cli, file_config: ConfigFile) -> Config {
     let lens = cli.lens.or(file_config.lens).unwrap_or(Lens::Module);
     let format = cli.format.or(file_config.format).unwrap_or(Format::Text);
     let depth = cli.depth.or(file_config.depth).unwrap_or(DEFAULT_DEPTH);
@@ -175,7 +166,7 @@ pub fn load(cli: &Cli) -> Result<Config> {
         DEFAULT_KEY_DIRS.iter().map(|s| s.to_string()).collect()
     };
 
-    Ok(Config {
+    Config {
         root,
         lens,
         format,
@@ -188,5 +179,131 @@ pub fn load(cli: &Cli) -> Result<Config> {
         ignore,
         include,
         key_dirs,
+    }
+}
+
+pub fn load(cli: &Cli) -> Result<Config> {
+    let root = cli.path.clone();
+    let config_root = resolve_root(&cli.path);
+
+    let config_file = if cli.no_config {
+        None
+    } else if let Some(path) = &cli.config {
+        Some(path.clone())
+    } else {
+        find_config_file(&config_root)
+    };
+
+    let file_config = match config_file {
+        Some(path) => load_config_file(&path)?,
+        None => ConfigFile::default(),
+    };
+
+    Ok(build_config(root, cli, file_config))
+}
+
+fn defaults_from_cli(cli: &Cli) -> Config {
+    build_config(cli.path.clone(), cli, ConfigFile::default())
+}
+
+pub fn init_config(cli: &Cli) -> Result<InitOutcome> {
+    let config_root = resolve_root(&cli.path);
+    let target = cli
+        .config
+        .clone()
+        .unwrap_or_else(|| config_root.join(".smarttree.yaml"));
+
+    if target.exists() {
+        return Ok(InitOutcome {
+            path: target,
+            created: false,
+        });
+    }
+
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|source| SmarttreeError::ConfigWrite {
+            path: target.clone(),
+            source,
+        })?;
+    }
+
+    let config = defaults_from_cli(cli);
+    let content = render_config_template(&config);
+    fs::write(&target, content).map_err(|source| SmarttreeError::ConfigWrite {
+        path: target.clone(),
+        source,
+    })?;
+
+    Ok(InitOutcome {
+        path: target,
+        created: true,
     })
+}
+
+fn render_config_template(config: &Config) -> String {
+    let mut out = String::new();
+    out.push_str("# smarttree config file\n");
+    out.push_str("# See README.md for details.\n\n");
+    writeln!(out, "lens: {}", lens_label(config.lens)).ok();
+    writeln!(out, "format: {}", format_label(config.format)).ok();
+    writeln!(out, "depth: {}", config.depth).ok();
+    writeln!(out, "max_items: {}", config.max_items).ok();
+    writeln!(out, "max_children: {}", config.max_children).ok();
+    writeln!(
+        out,
+        "respect_gitignore: {}",
+        bool_label(config.respect_gitignore)
+    )
+    .ok();
+    writeln!(out, "hidden: {}", bool_label(config.hidden)).ok();
+    writeln!(out, "unicode: {}", bool_label(config.unicode)).ok();
+    out.push('\n');
+
+    push_list(&mut out, "ignore", &config.ignore);
+    out.push('\n');
+    if config.include.is_empty() {
+        out.push_str("include: []\n");
+    } else {
+        push_list(&mut out, "include", &config.include);
+    }
+    out.push('\n');
+    push_list(&mut out, "key_dirs", &config.key_dirs);
+
+    out
+}
+
+fn push_list(out: &mut String, key: &str, values: &[String]) {
+    out.push_str(key);
+    out.push_str(":\n");
+    for value in values {
+        out.push_str("  - \"");
+        out.push_str(&escape_yaml(value));
+        out.push_str("\"\n");
+    }
+}
+
+fn escape_yaml(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('\"', "\\\"")
+}
+
+fn lens_label(lens: Lens) -> &'static str {
+    match lens {
+        Lens::Module => "module",
+        Lens::Files => "files",
+    }
+}
+
+fn format_label(format: Format) -> &'static str {
+    match format {
+        Format::Text => "text",
+        Format::Md => "md",
+    }
+}
+
+fn bool_label(value: bool) -> &'static str {
+    if value {
+        "true"
+    } else {
+        "false"
+    }
 }
